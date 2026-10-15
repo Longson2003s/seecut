@@ -50,7 +50,7 @@ test('reports a configured local model without exposing its API key', async () =
         return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b' }] });
       }
       assert.equal(url, 'http://ai-server.test/api/v0/models');
-      return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'loaded' }] });
+      return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'loaded', loaded_context_length: 65536 }] });
     },
   });
   const status = await fetch(`${baseUrl}/api/status`).then((response) => response.json());

@@ -13,7 +13,7 @@ test('validates the configured model and authenticates without exposing the key'
         return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b' }] });
       }
       assert.equal(url, 'http://ai-server.test/api/v0/models');
-      return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'loaded' }] });
+      return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'loaded', loaded_context_length: 65536 }] });
     },
   });
 
@@ -44,6 +44,49 @@ test('does not report a model as available while the local server has not loaded
   });
   assert.equal(status.available, false);
   assert.match(status.reason, /chưa được nạp/);
+});
+
+test('blocks an LM Studio model loaded with an insufficient context window', async () => {
+  const status = await getOpenAIStatus({
+    apiKey: 'private-local-token',
+    baseUrl: 'http://ai-server.test/v1',
+    model: 'qwen/qwen3.6-35b-a3b',
+    fetchImpl: async (url) => url.endsWith('/v1/models')
+      ? Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b' }] })
+      : Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'loaded', loaded_context_length: 4096 }] }),
+  });
+  assert.equal(status.available, false);
+  assert.match(status.reason, /context_length=65536/);
+});
+
+test('recognizes a sufficient LM Studio v1 instance when v0 reports the model alias unloaded', async () => {
+  const status = await getOpenAIStatus({
+    apiKey: 'private-local-token',
+    baseUrl: 'http://ai-server.test/v1',
+    model: 'qwen/qwen3.6-35b-a3b',
+    fetchImpl: async (url) => {
+      if (url.endsWith('/api/v1/models')) {
+        return Response.json({
+          models: [{
+            key: 'qwen/qwen3.6-35b-a3b',
+            loaded_instances: [{
+              id: 'qwen/qwen3.6-35b-a3b:2',
+              config: { context_length: 65536 },
+            }],
+          }],
+        });
+      }
+      if (url.endsWith('/v1/models')) {
+        return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b' }] });
+      }
+      if (url.endsWith('/api/v0/models')) {
+        return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'not-loaded' }] });
+      }
+      throw new Error(`Unexpected model status request: ${url}`);
+    },
+  });
+  assert.equal(status.available, true);
+  assert.equal(status.reason, null);
 });
 
 test('runs OpenAI-compatible tool calls and sends sampled frames as image URLs', async () => {
@@ -117,4 +160,26 @@ test('stops after an unbounded server rate-limit response instead of retrying fo
     },
   }), /HTTP 429/);
   assert.equal(requests, 1);
+});
+
+test('explains how to fix a model context-size error', async () => {
+  await assert.rejects(runOpenAIAgent({
+    apiKey: 'private-local-token',
+    baseUrl: 'http://ai-server.test/v1',
+    model: 'local-model',
+    frames: [],
+    prompt: 'Test.',
+    tools: [],
+    executeTool: async () => ({}),
+    onLog() {},
+    fetchImpl: async () => new Response(JSON.stringify({
+      error: {
+        code: 400,
+        message: 'request (17189 tokens) exceeds the available context size (4096 tokens)',
+        type: 'exceed_context_size_error',
+        n_prompt_tokens: 17189,
+        n_ctx: 4096,
+      },
+    }), { status: 400 }),
+  }), /ít nhất 17408/);
 });

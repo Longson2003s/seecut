@@ -29,7 +29,7 @@ node --env-file=.env web/server.mjs
 
 Set the base URL to the OpenAI-compatible `/v1` API root, the model ID to one exposed by `/v1/models`, and the key required by your local server. The key is sent only as a Bearer authorization header; it is not stored in project files or returned by the status endpoint. To use another port, set `PORT`. `SEECUT_DATA_DIR` changes where uploaded media and generated project files are stored; by default, project data lives in `web/data/`, which is excluded from Git.
 
-If the server exposes its native `/api/v0/models` status, the selected model must be loaded before a project can run. Use HTTPS if the AI server is on an untrusted network.
+If the server exposes its native `/api/v0/models` status, the selected model must be loaded before a project can run. SeeCut needs a loaded context of at least 65,536 tokens to fit source frames and workflow references. In LM Studio, load it with `POST /api/v1/models/load` and a JSON body such as `{"model":"qwen/qwen3.6-35b-a3b","context_length":65536}`. Use HTTPS if the AI server is on an untrusted network.
 
 Open <http://127.0.0.1:4173>. The server binds to localhost by default. Do not expose it to a public network.
 

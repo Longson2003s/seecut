@@ -1,6 +1,7 @@
 import { extractVideoFrames } from './pipeline-tools.mjs';
 
 const MAX_AGENT_TURNS = 48;
+const MINIMUM_LOADED_CONTEXT = 65_536;
 
 function normalizeBaseUrl(value) {
   const url = new URL(value);
@@ -62,26 +63,50 @@ export async function getOpenAIStatus({
     }
 
     const managementBase = normalizeBaseUrl(baseUrl).replace(/\/v1$/i, '');
-    try {
-      const managementResponse = await fetchImpl(endpoint(managementBase, 'api/v0/models'), {
-        headers: authHeaders(apiKey),
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (managementResponse.ok) {
-        const managementBody = await managementResponse.json();
-        const managedModels = managementBody.data || managementBody.models || [];
-        const managed = managedModels.find((item) => item.id === model || item.name === model || item.path === model);
-        if (managed?.state && managed.state !== 'loaded') {
-          return {
-            available: false,
-            model,
-            baseUrl,
-            reason: `Model "${model}" chưa được nạp (trạng thái: ${managed.state}). Hãy nạp model trong AI Local Server rồi thử lại.`,
-          };
+    const managementResponse = await fetchImpl(endpoint(managementBase, 'api/v0/models'), {
+      headers: authHeaders(apiKey),
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (managementResponse.ok) {
+      const managementBody = await managementResponse.json();
+      const managedModels = managementBody.data || managementBody.models || [];
+      const managed = managedModels.find((item) => item.id === model || item.name === model || item.path === model);
+      let loadedContext = managed?.loaded_context_length;
+      let loaded = managed?.state === 'loaded';
+      if (!loaded || (Number.isFinite(loadedContext) && loadedContext < MINIMUM_LOADED_CONTEXT)) {
+        const v1Response = await fetchImpl(endpoint(managementBase, 'api/v1/models'), {
+          headers: authHeaders(apiKey),
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (v1Response.ok) {
+          const v1Body = await v1Response.json();
+          const v1Models = v1Body.models || [];
+          const v1Model = v1Models.find((item) => item.key === model || item.id === model);
+          const instances = v1Model?.loaded_instances || [];
+          const instance = instances.find((item) => item.id === model)
+            || (instances.length === 1 ? instances[0] : null);
+          if (instance) {
+            loaded = true;
+            loadedContext = instance.config?.context_length ?? loadedContext;
+          }
         }
       }
-    } catch {
-      // Generic OpenAI-compatible servers may not expose a native model-state endpoint.
+      if (managed?.state && !loaded) {
+        return {
+          available: false,
+          model,
+          baseUrl,
+          reason: `Model "${model}" chưa được nạp (trạng thái: ${managed.state}). Hãy nạp model trong AI Local Server rồi thử lại.`,
+        };
+      }
+      if (Number.isFinite(loadedContext) && loadedContext < MINIMUM_LOADED_CONTEXT) {
+        return {
+          available: false,
+          model,
+          baseUrl,
+          reason: `Model "${model}" chỉ được nạp với context ${loadedContext} tokens. SeeCut cần ít nhất ${MINIMUM_LOADED_CONTEXT} tokens cho ảnh và tài liệu workflow; hãy nạp lại model với context_length=${MINIMUM_LOADED_CONTEXT}.`,
+        };
+      }
     }
 
     return { available: true, model, baseUrl, reason: null };
@@ -165,6 +190,20 @@ async function chatCompletion({ apiKey, baseUrl, model, messages, tools, signal,
     if (response.ok) return response.json();
 
     const message = await response.text();
+    if (response.status === 400 && message.includes('exceed_context_size_error')) {
+      let details = {};
+      try {
+        details = JSON.parse(message).error || {};
+      } catch {
+        // Keep the original response when the server uses a non-JSON error body.
+      }
+      const promptTokens = Number(details.n_prompt_tokens);
+      const contextTokens = Number(details.n_ctx);
+      const suggestion = Number.isFinite(promptTokens)
+        ? ` Yêu cầu hiện tại cần ${promptTokens} tokens; hãy nạp lại model với context_length ít nhất ${Math.ceil(promptTokens / 1024) * 1024} (khuyến nghị 65536 cho workflow SeeCut).`
+        : ' Hãy nạp lại model với context_length lớn hơn (khuyến nghị 65536 cho workflow SeeCut).';
+      throw new Error(`Context của model không đủ${Number.isFinite(contextTokens) ? ` (${contextTokens} tokens)` : ''}.${suggestion}`);
+    }
     const error = new Error(`OpenAI-compatible API trả HTTP ${response.status}: ${message.slice(0, 2000)}`);
     const delay = response.status === 429 ? retryDelayMs(response) : null;
     if (attempt === 3 || delay === null || delay > 120_000) throw error;
