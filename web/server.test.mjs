@@ -21,7 +21,7 @@ afterEach(async () => {
   await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-test('serves the studio and reports a missing Gemini API key', async () => {
+test('serves the studio and reports missing OpenAI-compatible server configuration', async () => {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'seecut-web-'));
   tempDirectories.push(dataDir);
   const { baseUrl } = await startServer({ dataDir, repoRoot: dataDir });
@@ -31,22 +31,31 @@ test('serves the studio and reports a missing Gemini API key', async () => {
   assert.match(await page.text(), /SeeCut Studio/);
 
   const status = await fetch(`${baseUrl}/api/status`).then((response) => response.json());
-  assert.equal(status.gemini.available, false);
-  assert.match(status.gemini.reason, /GEMINI_API_KEY/);
+  assert.equal(status.openai.available, false);
+  assert.match(status.openai.reason, /OPENAI_API_KEY/);
 });
 
-test('reports a configured Gemini model without exposing the API key', async () => {
+test('reports a configured local model without exposing its API key', async () => {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'seecut-web-'));
   tempDirectories.push(dataDir);
   const { baseUrl } = await startServer({
     dataDir,
     repoRoot: dataDir,
-    geminiApiKey: 'test-key-never-return-this',
-    geminiModel: 'gemini-test-model',
+    openAIApiKey: 'test-key-never-return-this',
+    openAIBaseUrl: 'http://ai-server.test/v1',
+    openAIModel: 'qwen/qwen3.6-35b-a3b',
+    fetchImpl: async (url, options) => {
+      assert.equal(options.headers.authorization, 'Bearer test-key-never-return-this');
+      if (url.endsWith('/v1/models')) {
+        return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b' }] });
+      }
+      assert.equal(url, 'http://ai-server.test/api/v0/models');
+      return Response.json({ data: [{ id: 'qwen/qwen3.6-35b-a3b', state: 'loaded' }] });
+    },
   });
   const status = await fetch(`${baseUrl}/api/status`).then((response) => response.json());
-  assert.equal(status.gemini.available, true);
-  assert.equal(status.gemini.model, 'gemini-test-model');
+  assert.equal(status.openai.available, true);
+  assert.equal(status.openai.model, 'qwen/qwen3.6-35b-a3b');
   assert.equal(JSON.stringify(status).includes('test-key-never-return-this'), false);
 });
 
@@ -108,7 +117,7 @@ test('rejects invalid titles and file traversal requests', async () => {
   assert.equal(traversal.status, 400);
 });
 
-test('does not start a project when Gemini API key is missing', async () => {
+test('does not start a project when local AI server credentials are missing', async () => {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'seecut-web-'));
   tempDirectories.push(dataDir);
   const { baseUrl } = await startServer({ dataDir, repoRoot: dataDir });
@@ -125,7 +134,7 @@ test('does not start a project when Gemini API key is missing', async () => {
 
   const start = await fetch(`${baseUrl}/api/projects/${project.id}/run`, { method: 'POST' });
   assert.equal(start.status, 503);
-  assert.match((await start.json()).error, /GEMINI_API_KEY/);
+  assert.match((await start.json()).error, /OPENAI_API_KEY/);
   const saved = await fetch(`${baseUrl}/api/projects/${project.id}`).then((response) => response.json());
   assert.equal(saved.project.status, 'draft');
 });

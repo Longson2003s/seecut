@@ -147,16 +147,16 @@ function renderProjectStatus() {
     ? 'AI đang làm việc — xem tiến trình bên dưới'
     : fileReady ? (project?.status === 'completed' ? 'Đã hoàn tất' : 'Sẵn sàng dựng') : 'Đang chờ video';
   els.progressPercent.textContent = running ? 'LIVE' : (project?.status === 'completed' ? '100%' : '—');
-  const providerMissing = state.status && !state.status.gemini.available;
+  const providerMissing = state.status && !state.status.openai.available;
   const oldNode = state.status && !state.status.nodeSupported;
   const platformNote = state.status?.platformNote;
-  const warning = providerMissing ? state.status.gemini.reason
+  const warning = providerMissing ? state.status.openai.reason
     : oldNode ? 'Cần Node.js 22 trở lên để chạy SeeCut.'
       : platformNote;
   els.warning.textContent = warning || '';
   els.warning.classList.toggle('hidden', !warning);
   els.run.disabled = !fileReady || running || providerMissing || oldNode || ['completed', 'cancelled'].includes(project?.status);
-  els.run.title = providerMissing ? state.status.gemini.reason : '';
+  els.run.title = providerMissing ? state.status.openai.reason : '';
   els.title.disabled = running;
   els.prompt.disabled = running;
   document.querySelectorAll('.mode-card input').forEach((input) => { input.disabled = running; });
@@ -234,7 +234,7 @@ function clearSelectedFile() {
 
 async function startNewProject() {
   if (!state.selectedFile) return showToast('Trước tiên hãy chọn video nguồn.');
-  if (!state.status?.gemini.available) return showToast(state.status?.gemini.reason || 'Chưa cấu hình Gemini API key.');
+  if (!state.status?.openai.available) return showToast(state.status?.openai.reason || 'AI Local Server chưa sẵn sàng.');
   const title = els.title.value.trim();
   if (!title) return showToast('Hãy nhập tên dự án.');
   const mode = document.querySelector('input[name="edit-mode"]:checked').value;
@@ -390,11 +390,11 @@ async function cancelRun() {
 async function initialize() {
   try {
     state.status = await api('/api/status');
-    els.engineDot.classList.toggle('ok', state.status.gemini.available);
-    els.engineDot.classList.toggle('bad', !state.status.gemini.available);
-    els.engineStatus.textContent = state.status.gemini.available
-      ? `API key đã cấu hình · ${state.status.gemini.model}`
-      : state.status.gemini.reason;
+    els.engineDot.classList.toggle('ok', state.status.openai.available);
+    els.engineDot.classList.toggle('bad', !state.status.openai.available);
+    els.engineStatus.textContent = state.status.openai.available
+      ? `OpenAI-compatible · ${state.status.openai.model}`
+      : state.status.openai.reason;
   } catch (error) {
     els.engineDot.classList.add('bad');
     els.engineStatus.textContent = error.message;

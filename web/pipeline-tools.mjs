@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { lstat, mkdir, readFile, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -71,12 +71,12 @@ const TOOL_DECLARATIONS = [
   },
   {
     name: 'review_output_video',
-    description: 'Cho Gemini xem trực tiếp video dựng và trả về hard defects cùng các mốc thời gian.',
+    description: 'Dùng model thị giác xem các khung hình trích xuất của video dựng và trả về hard defects cùng mốc thời gian.',
     parameters: { type: 'OBJECT', properties: { path: { type: 'STRING' } }, required: ['path'] },
   },
   {
     name: 'compare_output_videos',
-    description: 'Cho Gemini so sánh hai phiên bản video; đánh giá hai lần và đổi thứ tự A/B.',
+    description: 'Dùng model thị giác so sánh hai phiên bản bằng khung hình; đánh giá hai lần và đổi thứ tự A/B.',
     parameters: {
       type: 'OBJECT',
       properties: { path_a: { type: 'STRING' }, path_b: { type: 'STRING' } },
@@ -137,6 +137,7 @@ function runProcess(command, args, { cwd, signal, onLog, timeoutMs = 30 * 60_000
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
     const abort = () => child.kill('SIGTERM');
     signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
     const collect = (stream, name) => stream.on('data', (buffer) => {
       const text = buffer.toString();
       totalBytes += Buffer.byteLength(text);
@@ -397,10 +398,10 @@ export async function prepareVideoForMode({ project, signal, onLog }) {
   if (project.editMode !== 'sample') return { filePath: source, bytes: info.size };
 
   const ffmpeg = findExecutable(process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
-  if (!ffmpeg) throw new Error('Không tìm thấy ffmpeg để cắt sample 30 giây trước khi gửi video cho Gemini.');
+  if (!ffmpeg) throw new Error('Không tìm thấy ffmpeg để cắt sample 30 giây.');
   const extension = path.extname(source).toLowerCase();
   const sample = path.join(project.directory, `source_sample${extension}`);
-  onLog('Đang tạo sample tối đa 30 giây; chỉ sample này được gửi cho Gemini.');
+  onLog('Đang tạo sample tối đa 30 giây; chỉ sample này được dùng cho lần dựng.');
   await runProcess(ffmpeg, [
     '-y', '-i', source, '-t', '30',
     '-map', '0:v:0', '-map', '0:a?',
@@ -409,4 +410,47 @@ export async function prepareVideoForMode({ project, signal, onLog }) {
   const sampleInfo = await stat(sample);
   if (sampleInfo.size === 0) throw new Error('ffmpeg không tạo được video sample.');
   return { filePath: sample, bytes: sampleInfo.size };
+}
+
+export async function extractVideoFrames({ filePath, signal, onLog, maxFrames = 24 }) {
+  const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const ffprobeName = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
+  const ffmpeg = findExecutable(ffmpegName);
+  const ffprobe = findExecutable(ffprobeName);
+  if (!ffmpeg || !ffprobe) throw new Error('Cần ffmpeg và ffprobe để trích xuất khung hình cho model thị giác.');
+  if (!Number.isInteger(maxFrames) || maxFrames < 1 || maxFrames > 48) {
+    throw new Error('Giới hạn số khung hình phải từ 1 đến 48.');
+  }
+
+  const probe = await runProcess(ffprobe, [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath,
+  ], { cwd: path.dirname(filePath), signal, onLog, timeoutMs: 30_000 });
+  const duration = Number(probe.output.trim());
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Không xác định được thời lượng video.');
+
+  const interval = Math.max(1, duration / maxFrames);
+  const fps = 1 / interval;
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'seecut-frames-'));
+  try {
+    onLog(`Đang trích xuất tối đa ${maxFrames} khung hình để gửi tới AI Local Server.`);
+    await runProcess(ffmpeg, [
+      '-v', 'error', '-i', filePath,
+      '-vf', `fps=${fps.toFixed(6)},scale=w='min(768,iw)':h=-2`,
+      '-frames:v', String(maxFrames),
+      '-q:v', '5',
+      path.join(directory, 'frame-%03d.jpg'),
+    ], { cwd: directory, signal, onLog, timeoutMs: 5 * 60_000 });
+
+    const files = (await readdir(directory))
+      .filter((name) => /^frame-\d{3}\.jpg$/.test(name))
+      .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+    if (!files.length) throw new Error('Không trích xuất được khung hình từ video.');
+    if (files.length > maxFrames) throw new Error('FFmpeg trích xuất vượt quá số khung hình cho phép.');
+    return await Promise.all(files.map(async (name, index) => ({
+      timestamp: Math.min(index * interval, duration),
+      dataUrl: `data:image/jpeg;base64,${(await readFile(path.join(directory, name))).toString('base64')}`,
+    })));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }

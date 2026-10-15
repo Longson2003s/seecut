@@ -22,7 +22,7 @@
 ---
 
 ## 亮点
-1. **See：让 AI 真正"看"视频。** Claude、GPT 这类模型通常要先把视频抽成几张图片再看，看不出动效和节奏。SeeCut 接入 Gemini（通过 Antigravity CLI）直接看视频，素材理解和质检都靠它。
+1. **See：让 AI 真正"看"视频。** 原始 SeeCut CLI 接入 Gemini（通过 Antigravity CLI）直接看视频。另见 [SeeCut Studio 网页版](web/README.md)：它使用 OpenAI-compatible vision 服务分析最多 24 张抽取帧，不能完整判断动效和节奏。
 2. **看得准：评委是校准过的。** 同一条视频换个提示词，AI 能从"标准"说成"土味"。我们用答案已知的片子测评委，发现"打绝对分"不可靠、"两条比哪条好"才可靠，所以质检用两两对比，交换位置各跑一次都赢才算。
 3. **Loop：自己改、自己挑。** 每版先过硬伤检查，再和上一版两两对比，赢了才采纳；最多 3 版，每版必须有肉眼可见的进步。眼睛准了，循环才会越改越好，而不是越改越偏。
 4. **找真证据。** 口播提到什么，就去截真的网页、界面、案例当画面证据，禁止用假界面凑满画面。没有额外 B-roll 也能做得有料。
@@ -41,7 +41,7 @@
 
 **先样片、后全片。** 长视频请先拿开头 20-30 秒跑一遍，确认风格和方向没问题再跑全片（素材超过 60 秒时 skill 也会先问你）。一次循环会出 2-3 版，每版都要渲染和 AI 看片对比，一条 25 秒样片目前约 1 小时，片子越长越久。
 
-**本地 Web 界面：** 也可以运行 `node --env-file=.env web/server.mjs` 打开 SeeCut Studio，通过浏览器上传素材、填写剪辑要求并查看 Gemini AI 进度。需先在根目录 `.env` 配置 `GEMINI_API_KEY`；视频会发送到 Google Gemini API，详细设置见 [web/README.md](web/README.md)。底层剪辑管线目前只记录为在 macOS 测试，Windows 可能需要 WSL。
+**本地 Web 界面：** 也可以运行 `node --env-file=.env web/server.mjs` 打开 SeeCut Studio，通过浏览器上传素材、填写剪辑要求并查看 AI 进度。先在根目录 `.env` 设置 OpenAI-compatible AI Local Server 的 URL、key 和 vision model；原视频保留在本机，只会把抽取的最多 24 张画面发送到该服务器。详见 [web/README.md](web/README.md)。
 
 ## 三步流水线
 | 步骤 | 做什么 | 说明 |

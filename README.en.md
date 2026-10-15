@@ -22,7 +22,7 @@ The skill's own docs (under `skill/`, `digital-human/`, `jianying/`) are written
 ---
 
 ## Highlights
-1. **See: the AI actually watches the video.** Models like Claude and GPT usually have to look at a few frames extracted from a video, which can't show motion or pacing. SeeCut uses Gemini (through the Antigravity CLI) to watch video directly, both to understand the footage and to review its own cuts.
+1. **See: the AI actually watches the video.** The original SeeCut CLI uses Gemini (through the Antigravity CLI) to inspect video directly. The [SeeCut Studio web app](web/README.md) instead uses an OpenAI-compatible vision service to analyze up to 24 extracted frames, so it cannot fully judge motion or pacing.
 2. **Seeing accurately: a calibrated judge.** Change the prompt and the same AI will call one video "polished" or "tacky". We tested the judge on videos with known answers: absolute scores were unreliable, while "which of these two is better" was reliable. So every review is a pairwise comparison, run twice with the order swapped, and a version only wins if it wins both times.
 3. **Loop: it edits and chooses by itself.** Each version must pass hard checks, then beat the previous version head-to-head before it is adopted. At most 3 versions, each with a visible improvement. With an accurate eye, the loop gets better instead of drifting.
 4. **Real evidence, not fake UI.** Whatever the speaker mentions, the agent captures the real web page, product screen or example as visual evidence. Mock interfaces used to "fill the frame" are forbidden. You get a rich video even without extra B-roll.
@@ -42,7 +42,7 @@ The skill's own docs (under `skill/`, `digital-human/`, `jianying/`) are written
 
 **Sample first, then the full video.** For longer footage, run the first 20–30 seconds, confirm the style and direction, then run the whole thing (the skill will ask you first when the footage is longer than 60 s). One loop produces 2–3 versions, each rendered and reviewed by the AI, so a 25-second sample currently takes about an hour, and longer videos take longer.
 
-**Local web interface:** You can also run `node --env-file=.env web/server.mjs` to open SeeCut Studio, upload footage in a browser, describe the edit, and follow the Gemini AI run. Set `GEMINI_API_KEY` in the repository-root `.env` first. Videos are sent to the Google Gemini API; see [web/README.md](web/README.md) for details. The underlying editing pipeline is documented as tested on macOS; Windows may require WSL.
+**Local web interface:** You can also run `node --env-file=.env web/server.mjs` to open SeeCut Studio, upload footage in a browser, describe the edit, and follow the AI run. Configure the OpenAI-compatible AI Local Server URL, key, and vision model in the repository-root `.env`. The source video stays local; up to 24 extracted frames are sent to that server. See [web/README.md](web/README.md) for details. The underlying editing pipeline is documented as tested on macOS; Windows may require WSL.
 
 ## Three-step pipeline
 | Step | What it does | Notes |
