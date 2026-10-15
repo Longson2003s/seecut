@@ -42,6 +42,8 @@ The skill's own docs (under `skill/`, `digital-human/`, `jianying/`) are written
 
 **Sample first, then the full video.** For longer footage, run the first 20–30 seconds, confirm the style and direction, then run the whole thing (the skill will ask you first when the footage is longer than 60 s). One loop produces 2–3 versions, each rendered and reviewed by the AI, so a 25-second sample currently takes about an hour, and longer videos take longer.
 
+**Local web interface:** You can also run `node --env-file=.env web/server.mjs` to open SeeCut Studio, upload footage in a browser, describe the edit, and follow the Gemini AI run. Set `GEMINI_API_KEY` in the repository-root `.env` first. Videos are sent to the Google Gemini API; see [web/README.md](web/README.md) for details. The underlying editing pipeline is documented as tested on macOS; Windows may require WSL.
+
 ## Three-step pipeline
 | Step | What it does | Notes |
 |---|---|---|

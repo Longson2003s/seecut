@@ -9,3 +9,4 @@ __pycache__/
 .env
 **/build/frames/
 **/build/person/
+web/data/

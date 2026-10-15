@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f3ed">
+    <title>SeeCut Studio — AI Video Editor</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="SeeCut Studio">
+          <span class="brand-mark">S<span>✳</span></span>
+          <span class="brand-copy">seecut<span>STUDIO</span></span>
+        </a>
+
+        <button class="new-project" id="new-project-button" type="button">
+          <span>＋</span> Dự án mới
+        </button>
+
+        <div class="side-label">KHÔNG GIAN LÀM VIỆC</div>
+        <button class="nav-item active" type="button" data-view="editor">
+          <span class="nav-icon">▧</span> Studio
+        </button>
+        <div class="side-label recent-label">DỰ ÁN GẦN ĐÂY</div>
+        <div class="project-list" id="project-list">
+          <div class="empty-projects">Chưa có dự án</div>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="engine-card">
+            <div class="engine-heading"><span class="status-dot" id="engine-dot"></span> GEMINI VIDEO ENGINE</div>
+            <p id="engine-status">Đang kiểm tra Gemini API…</p>
+            <a href="https://github.com/YeJe-cpu/SeeCut" target="_blank" rel="noreferrer">Tài liệu dự án <span>↗</span></a>
+          </div>
+          <div class="account-row">
+            <div class="avatar">SC</div>
+            <div><strong>Local workspace</strong><span>Dữ liệu lưu trên máy này</span></div>
+            <span class="more">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>Workspace</span><b>/</b><strong id="breadcrumb-title">Studio</strong></div>
+          <div class="top-actions">
+            <span class="local-badge"><span></span> LOCAL WORKSPACE</span>
+            <a class="docs-link" href="https://github.com/YeJe-cpu/SeeCut" target="_blank" rel="noreferrer">Docs <span>↗</span></a>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="welcome-row">
+            <div>
+              <div class="eyebrow"><span class="eyebrow-line"></span> AI VIDEO WORKSPACE</div>
+              <h1>Biến footage thành<br><em>câu chuyện chuyển động.</em></h1>
+              <p class="intro">Tải video lên, mô tả ý tưởng. SeeCut sẽ dựng, tự xem lại và cải thiện theo đúng workflow.</p>
+            </div>
+            <div class="orbit-art" aria-hidden="true">
+              <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+              <div class="orbit-center">SC<span>✳</span></div>
+              <span class="orbit-tag tag-see">SEE</span><span class="orbit-tag tag-cut">CUT</span><span class="orbit-tag tag-loop">LOOP</span>
+              <span class="sparkle sparkle-one">✳</span><span class="sparkle sparkle-two">✳</span>
+            </div>
+          </section>
+
+          <div class="workspace-grid">
+            <section class="editor-column">
+              <div class="panel upload-panel">
+                <div class="panel-title-row">
+                  <div class="step-number">01</div>
+                  <div><h2>Footage của bạn</h2><p>Bắt đầu với video nói chuyện — phần còn lại để SeeCut lo.</p></div>
+                </div>
+                <label class="field-label" for="project-title">TÊN DỰ ÁN</label>
+                <input class="text-input" id="project-title" maxlength="100" placeholder="Ví dụ: Giới thiệu sản phẩm mới" autocomplete="off">
+
+                <label class="dropzone" id="dropzone" for="video-input">
+                  <input id="video-input" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.m4v,.mkv">
+                  <div class="upload-icon"><span>↑</span></div>
+                  <strong id="upload-title">Thả video vào đây</strong>
+                  <span id="upload-subtitle">hoặc <u>chọn tệp từ máy tính</u></span>
+                  <small>MP4, MOV, M4V, WEBM, MKV <i>·</i> tối đa 4 GB</small>
+                </label>
+                <div class="privacy-note"><span>↗</span><p><strong>Video được gửi tới Gemini API.</strong> Chế độ sample chỉ gửi tối đa 30 giây đầu; chế độ toàn bộ gửi cả video.</p></div>
+
+                <div class="video-preview hidden" id="video-preview">
+                  <video id="source-preview" controls playsinline></video>
+                  <div class="video-meta"><div><strong id="video-name"></strong><span id="video-details"></span></div><button class="text-button" id="remove-video" type="button">Thay video</button></div>
+                </div>
+
+                <div class="field-label mode-label">PHẠM VI DỰNG</div>
+                <div class="mode-options">
+                  <label class="mode-card selected" data-mode="sample">
+                    <input type="radio" name="edit-mode" value="sample" checked>
+                    <span class="mode-icon sample-icon">◷</span>
+                    <span class="mode-copy"><strong>Sample trước</strong><small>20–30 giây đầu · nên dùng</small></span>
+                    <span class="radio-indicator"></span>
+                  </label>
+                  <label class="mode-card" data-mode="full">
+                    <input type="radio" name="edit-mode" value="full">
+                    <span class="mode-icon full-icon">↗</span>
+                    <span class="mode-copy"><strong>Toàn bộ video</strong><small>Dựng toàn bộ footage</small></span>
+                    <span class="radio-indicator"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="panel prompt-panel">
+                <div class="panel-title-row compact-title">
+                  <div class="step-number">02</div>
+                  <div><h2>Chỉ dẫn cho AI <span class="optional">TUỲ CHỌN</span></h2><p>Phong cách, điểm cần nhấn mạnh hoặc điều cần tránh.</p></div>
+                </div>
+                <textarea id="user-prompt" maxlength="10000" placeholder="Ví dụ: Nhấn mạnh phần so sánh trước/sau. Giữ tone vui, nhanh; không dùng nhạc nền."></textarea>
+                <div class="prompt-footer"><span>SeeCut vẫn tuân theo các quy tắc chất lượng trong skill.</span><span id="prompt-count">0 / 10000</span></div>
+              </div>
+            </section>
+
+            <aside class="right-column">
+              <div class="panel pipeline-panel">
+                <div class="pipeline-top"><div><div class="panel-kicker">THE SEECUT METHOD</div><h2>Ba bước. Một câu chuyện.</h2></div><span class="sparkle-badge">✳</span></div>
+                <div class="pipeline-steps">
+                  <div class="pipeline-step"><span class="step-icon see-icon">◉</span><div><strong>See the footage</strong><small>AI hiểu ngữ cảnh, tìm bằng chứng thật.</small></div><span class="step-check">01</span></div>
+                  <div class="pipeline-step"><span class="step-icon cut-icon">✂</span><div><strong>Cut with intent</strong><small>Shotbook, motion graphics và render.</small></div><span class="step-check">02</span></div>
+                  <div class="pipeline-step"><span class="step-icon loop-icon">↻</span><div><strong>Loop until it works</strong><small>Hard gates, AI review, tối đa 3 phiên bản.</small></div><span class="step-check">03</span></div>
+                </div>
+                <div class="pipeline-foot"><span class="tiny-check">✓</span> Không giả giao diện. Không bỏ qua kiểm duyệt.</div>
+              </div>
+
+              <div class="panel result-panel" id="result-panel">
+                <div class="result-heading"><div><div class="panel-kicker">PROJECT STATUS</div><h2 id="result-title">Sẵn sàng bắt đầu</h2></div><span class="status-pill idle" id="status-pill">NHÁP</span></div>
+                <p class="result-description" id="result-description">Video và file đầu ra được lưu cục bộ trong workspace của dự án.</p>
+                <div class="progress-track"><span id="progress-bar"></span></div>
+                <div class="progress-label"><span id="progress-label">Đang chờ video</span><span id="progress-percent">—</span></div>
+                <div class="run-warning hidden" id="environment-warning"></div>
+                <button class="run-button" id="run-button" type="button" disabled><span>✳</span> Bắt đầu dựng với AI <b>→</b></button>
+                <button class="cancel-button hidden" id="cancel-button" type="button">Dừng tác vụ</button>
+                <div class="output-list" id="output-list"></div>
+              </div>
+            </aside>
+          </div>
+
+          <section class="activity-panel panel" id="activity-panel">
+            <div class="activity-heading"><div><span class="activity-pulse"></span><h2>Hoạt động của AI</h2><span class="live-tag" id="live-tag">LIVE LOG</span></div><button class="text-button" id="clear-log" type="button">Xoá hiển thị</button></div>
+            <div class="log-window" id="log-window"><div class="log-empty"><span>✳</span><p>Nhật ký tiến trình sẽ xuất hiện ở đây khi AI bắt đầu làm việc.</p></div></div>
+          </section>
+
+          <footer class="footer"><span>SEECUT STUDIO <i>·</i> SEE, CUT, LOOP.</span><span>Local-first. Your footage stays on this machine.</span></footer>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

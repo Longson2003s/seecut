@@ -41,6 +41,8 @@
 
 **先样片、后全片。** 长视频请先拿开头 20-30 秒跑一遍，确认风格和方向没问题再跑全片（素材超过 60 秒时 skill 也会先问你）。一次循环会出 2-3 版，每版都要渲染和 AI 看片对比，一条 25 秒样片目前约 1 小时，片子越长越久。
 
+**本地 Web 界面：** 也可以运行 `node --env-file=.env web/server.mjs` 打开 SeeCut Studio，通过浏览器上传素材、填写剪辑要求并查看 Gemini AI 进度。需先在根目录 `.env` 配置 `GEMINI_API_KEY`；视频会发送到 Google Gemini API，详细设置见 [web/README.md](web/README.md)。底层剪辑管线目前只记录为在 macOS 测试，Windows 可能需要 WSL。
+
 ## 三步流水线
 | 步骤 | 做什么 | 说明 |
 |---|---|---|
