@@ -181,12 +181,25 @@ async function chatCompletion({ apiKey, baseUrl, model, messages, tools, signal,
   }
 
   for (let attempt = 0; attempt <= 3; attempt += 1) {
-    const response = await fetchImpl(endpoint(baseUrl, 'chat/completions'), {
-      method: 'POST',
-      headers: authHeaders(apiKey, true),
-      body: JSON.stringify(body),
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10 * 60_000)]) : AbortSignal.timeout(10 * 60_000),
-    });
+    let response;
+    try {
+      response = await fetchImpl(endpoint(baseUrl, 'chat/completions'), {
+        method: 'POST',
+        headers: authHeaders(apiKey, true),
+        body: JSON.stringify(body),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10 * 60_000)]) : AbortSignal.timeout(10 * 60_000),
+      });
+    } catch (cause) {
+      if (signal?.aborted) throw signal.reason || cause;
+      const detail = cause.cause?.message || cause.message || 'Kết nối bị đóng.';
+      if (attempt === 3) {
+        throw new Error(`Không kết nối được AI Local Server sau 4 lần thử: ${detail}`, { cause });
+      }
+      const delay = (attempt + 1) * 1000;
+      onLog(`Kết nối AI Local Server bị gián đoạn (${detail}); thử lại sau ${delay / 1000}s.`);
+      await waitForRetry(delay, signal);
+      continue;
+    }
     if (response.ok) return response.json();
 
     const message = await response.text();

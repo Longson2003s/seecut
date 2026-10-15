@@ -183,3 +183,49 @@ test('explains how to fix a model context-size error', async () => {
     }), { status: 400 }),
   }), /ít nhất 17408/);
 });
+
+test('retries transient network failures and surfaces the cause if they persist', async () => {
+  let requests = 0;
+  const logs = [];
+  const result = await runOpenAIAgent({
+    apiKey: 'private-local-token',
+    baseUrl: 'http://ai-server.test/v1',
+    model: 'local-model',
+    frames: [],
+    prompt: 'Test.',
+    tools: [],
+    executeTool: async () => ({}),
+    onLog: (line) => logs.push(line),
+    fetchImpl: async () => {
+      requests += 1;
+      if (requests < 3) {
+        const error = new TypeError('fetch failed');
+        error.cause = new Error('connect ECONNRESET');
+        throw error;
+      }
+      return Response.json({ choices: [{ message: { role: 'assistant', content: 'Connected.' } }] });
+    },
+  });
+  assert.equal(result, 'Connected.');
+  assert.equal(requests, 3);
+  assert.equal(logs.filter((line) => line.includes('ECONNRESET')).length, 2);
+
+  requests = 0;
+  await assert.rejects(runOpenAIAgent({
+    apiKey: 'private-local-token',
+    baseUrl: 'http://ai-server.test/v1',
+    model: 'local-model',
+    frames: [],
+    prompt: 'Test.',
+    tools: [],
+    executeTool: async () => ({}),
+    onLog() {},
+    fetchImpl: async () => {
+      requests += 1;
+      const error = new TypeError('fetch failed');
+      error.cause = new Error('connect ECONNREFUSED');
+      throw error;
+    },
+  }), /sau 4 lần thử: connect ECONNREFUSED/);
+  assert.equal(requests, 4);
+});
